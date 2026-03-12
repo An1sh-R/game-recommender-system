@@ -5,3 +5,4 @@ venv/
 data/raw/
 data/processed/
 *.pkl
+data/vectors/

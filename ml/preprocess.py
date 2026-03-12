@@ -1,6 +1,6 @@
 import pandas as pd
 
-df = pd.read_csv('data/raw/games.csv')
+df = pd.read_csv('data/raw/games.csv',index_col=False) # index_col=False to prevent first column from being treated as index (nightmare)
 print("Original Shape:", df.shape)
 
 # select useful columns
