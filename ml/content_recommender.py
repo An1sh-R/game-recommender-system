@@ -41,7 +41,7 @@ def recommend_games(game_name: str, top_n: int = 5):
     idx = find_game_index(game_name)
 
     if idx is None:
-        return {"error": "Game not found"}
+        return []
 
     similarities = cosine_similarity(tfidf_matrix[idx], tfidf_matrix).flatten()
 
@@ -58,5 +58,5 @@ def recommend_games(game_name: str, top_n: int = 5):
 
     results["similarity_score"] = similarities[similar_indices]
     results["weighted_score"] = weighted_scores[similar_indices]
-
+    results["index"] = similar_indices
     return results.to_dict(orient="records") # convert to list of dicts for easier JSON serialization
