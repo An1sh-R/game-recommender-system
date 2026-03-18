@@ -2,6 +2,7 @@ import json
 import pickle
 import redis
 import numpy as np
+import pandas as pd
 from typing import List, Dict
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -44,7 +45,7 @@ def trait_similarity(player_vec: np.ndarray, game_vec: np.ndarray) -> float:
     )[0][0]
 
 
-def get_recommendations(game: str, quiz_answers: List[int], top_n: int = 5):
+def get_recommendations(game: str, quiz_answers: List[int], top_n: int = 5) -> List[Dict]:
 
     cache_key = f"recommendations:{game}:{top_n}:{','.join(map(str, quiz_answers))}"
 
@@ -86,3 +87,49 @@ def get_recommendations(game: str, quiz_answers: List[int], top_n: int = 5):
     redis_client.set(cache_key, json.dumps(results), ex=3600)
 
     return results
+
+GAME_METADATA = pd.read_csv("data/vectors/games_metadata.csv")
+
+def get_quiz_recommendations(quiz_answers: List[int], top_n: int = 5,metadata=GAME_METADATA) -> List[Dict]:
+    cache_key = f"quiz_recommendation:{top_n}:{','.join(map(str,quiz_answers))}"
+    cached_result = redis_client.get(cache_key)
+
+    if cached_result is not None:
+        print("Quiz Cache hit")
+        return json.loads(str(cached_result))
+
+    print("Quiz Cache miss")
+    player_profile = compute_player_profile(quiz_answers)
+    player_vec = profile_to_vector(player_profile)
+    results = []
+
+    # iterate over all games and compute similarity
+    for idx, game_trait_dict in enumerate(game_traits):
+        game_vec = np.array(list(game_trait_dict.values()))
+        player_match = trait_similarity(player_vec, game_vec)
+        popularity = metadata.iloc[idx]["popularity"]
+        hybrid_score = (0.7*player_match) + (0.3*popularity)
+        results.append({
+            "index": idx,
+            "player_match": float(player_match),
+            "popularity": float(popularity),
+            "hybrid_score": float(hybrid_score)
+        })
+    # sort by player match and return top N
+    results = sorted(results, key=lambda x: x["hybrid_score"], reverse=True)
+    top_results = results[:top_n] # get top N results
+
+    final_results = []
+    for r in top_results:
+        idx = r["index"]
+        game_info = metadata.iloc[idx] # get game info by index from metadata
+        final_results.append({
+            "Name": game_info["Name"],
+            "Genres": game_info["Genres"],
+            "Tags": game_info["Tags"],
+            "popularity": game_info["popularity"],
+            "player_match": r["player_match"]
+        })
+    redis_client.set(cache_key, json.dumps(final_results), ex=3600)
+    return final_results
+ 
