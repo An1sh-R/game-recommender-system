@@ -88,7 +88,10 @@ def get_recommendations(game: str, quiz_answers: List[int], top_n: int = 5) -> L
 
     return results
 
+
+
 GAME_METADATA = pd.read_csv("data/vectors/games_metadata.csv")
+game_trait_matrix = np.array([list(trait_dict.values()) for trait_dict in game_traits])
 
 def get_quiz_recommendations(quiz_answers: List[int], top_n: int = 5,metadata=GAME_METADATA) -> List[Dict]:
     cache_key = f"quiz_recommendation:{top_n}:{','.join(map(str,quiz_answers))}"
@@ -103,33 +106,28 @@ def get_quiz_recommendations(quiz_answers: List[int], top_n: int = 5,metadata=GA
     player_vec = profile_to_vector(player_profile)
     results = []
 
-    # iterate over all games and compute similarity
-    for idx, game_trait_dict in enumerate(game_traits):
-        game_vec = np.array(list(game_trait_dict.values()))
-        player_match = trait_similarity(player_vec, game_vec)
-        popularity = metadata.iloc[idx]["popularity"]
-        hybrid_score = (0.7*player_match) + (0.3*popularity)
-        results.append({
-            "index": idx,
-            "player_match": float(player_match),
-            "popularity": float(popularity),
-            "hybrid_score": float(hybrid_score)
-        })
-    # sort by player match and return top N
-    results = sorted(results, key=lambda x: x["hybrid_score"], reverse=True)
-    top_results = results[:top_n] # get top N results
+    # VECTORIZED similarity (FAST)
+    similarities = cosine_similarity(
+        player_vec.reshape(1, -1),
+        game_trait_matrix
+    ).flatten().astype(float)
+    popularity = np.array(metadata["popularity"], dtype=float)
+    # hybrid score
+    hybrid_scores = 0.7 * similarities + 0.3 * popularity
+    top_indices = np.argsort(hybrid_scores)[::-1][:top_n]
 
-    final_results = []
-    for r in top_results:
-        idx = r["index"]
-        game_info = metadata.iloc[idx] # get game info by index from metadata
-        final_results.append({
+    results = []
+    for idx in top_indices:
+        game_info = metadata.iloc[idx]
+
+        results.append({
             "Name": game_info["Name"],
             "Genres": game_info["Genres"],
             "Tags": game_info["Tags"],
-            "popularity": game_info["popularity"],
-            "player_match": r["player_match"]
+            "popularity": float(popularity[idx]),
+            "player_match": float(similarities[idx]),
+            "hybrid_score": float(hybrid_scores[idx])
         })
-    redis_client.set(cache_key, json.dumps(final_results), ex=3600)
-    return final_results
+    redis_client.set(cache_key, json.dumps(results), ex=3600)
+    return results
  

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Game Recommender</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            max-width: 900px;
+            margin: auto;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #38bdf8;
+        }
+
+        h2 {
+            margin-top: 30px;
+            color: #94a3b8;
+        }
+
+        input, button {
+            padding: 12px;
+            margin: 10px 0;
+            width: 100%;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+        }
+
+        input {
+            background: #1e293b;
+            color: white;
+        }
+
+        button {
+            background: #38bdf8;
+            color: black;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #0ea5e9;
+        }
+
+        .result {
+            background: #1e293b;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: 0.2s;
+        }
+
+        .result:hover {
+            transform: scale(1.02);
+        }
+
+        .result h3 {
+            color: #38bdf8;
+            margin-bottom: 8px;
+        }
+
+        .result p {
+            margin: 4px 0;
+            color: #cbd5f5;
+        }
+
+        .score {
+            display: flex;
+            gap: 15px;
+            margin-top: 8px;
+            font-size: 14px;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+
+        .similarity {
+            background: #22c55e;
+            color: black;
+        }
+
+        .player {
+            background: #facc15;
+            color: black;
+        }
+
+        .popularity {
+            background: #a78bfa;
+            color: black;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>🎮 Game Recommender</h1>
+
+<h2>Game-Based Recommendation</h2>
+<input type="text" id="gameInput" placeholder="Enter game name (e.g., witcher 3)">
+<button onclick="recommendGame()">Get Recommendations</button>
+
+<h2>Quiz-Based Recommendation</h2>
+
+<div id="quiz">
+    <p>Answer from 1–5</p>
+
+    <label>Exploration</label>
+    <input type="range" min="1" max="5" value="3" id="q1">
+
+    <label>Story</label>
+    <input type="range" min="1" max="5" value="3" id="q2">
+
+    <label>Challenge</label>
+    <input type="range" min="1" max="5" value="3" id="q3">
+
+    <label>Strategy</label>
+    <input type="range" min="1" max="5" value="3" id="q4">
+
+    <label>Social</label>
+    <input type="range" min="1" max="5" value="3" id="q5">
+
+    <label>Relaxation</label>
+    <input type="range" min="1" max="5" value="3" id="q6">
+
+    <label>Extra 1</label>
+    <input type="range" min="1" max="5" value="3" id="q7">
+
+    <label>Extra 2</label>
+    <input type="range" min="1" max="5" value="3" id="q8">
+
+    <label>Extra 3</label>
+    <input type="range" min="1" max="5" value="3" id="q9">
+
+    <label>Extra 4</label>
+    <input type="range" min="1" max="5" value="3" id="q10">
+
+    <button onclick="recommendQuiz()">Get Quiz Recommendations</button>
+</div>
+
+<h2>Results</h2>
+<div id="results"></div>
+
+<script>
+const API_URL = "http://127.0.0.1:8000";
+
+function displayResults(data) {
+    const container = document.getElementById("results");
+    container.innerHTML = "";
+
+    data.recommendations.forEach(game => {
+        const div = document.createElement("div");
+        div.className = "result";
+
+        div.innerHTML = `
+            <h3>${game.Name}</h3>
+            <p><b>Tags:</b> ${game.Tags.split(",").join(" • ")}</p>
+            <div class="score">
+                <span class="badge similarity">Similarity: ${game.similarity_score?.toFixed(2) ?? "—"}</span>
+                <span class="badge player">Match: ${game.player_match?.toFixed(2) ?? "—"}</span>
+                <span class="badge popularity">Pop: ${game.popularity.toFixed(2)}</span>
+            </div>
+        `;
+
+        container.appendChild(div);
+    });
+}
+
+function recommendGame() {
+    const game = document.getElementById("gameInput").value;
+
+    fetch(`${API_URL}/recommend/game`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            game: game,
+            quiz_answers: [3,3,3,3,3,3,3,3,3,3],
+            top_n: 5
+        })
+    })
+    .then(res => res.json())
+    .then(data => displayResults(data));
+}
+
+function recommendQuiz() {
+    const quiz = [
+        q1.value, q2.value, q3.value, q4.value, q5.value,
+        q6.value, q7.value, q8.value, q9.value, q10.value
+    ].map(Number);
+
+    fetch(`${API_URL}/recommend/quiz`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            quiz_answers: quiz,
+            top_n: 5
+        })
+    })
+    .then(res => res.json())
+    .then(data => displayResults(data));
+}
+</script>
+
+</body>
+</html>
