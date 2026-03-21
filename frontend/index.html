@@ -1,218 +1,568 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Game Recommender</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, sans-serif;
-            background: #0f172a;
-            color: #e2e8f0;
-            max-width: 900px;
-            margin: auto;
-            padding: 20px;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Game Recommender</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-soft: #1f2937;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --danger: #f87171;
+      --success: #4ade80;
+      --card: #0b1220;
+      --border: #334155;
+    }
 
-        h1 {
-            text-align: center;
-            color: #38bdf8;
-        }
+    * { box-sizing: border-box; }
 
-        h2 {
-            margin-top: 30px;
-            color: #94a3b8;
-        }
+    body {
+      margin: 0;
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(circle at top, #172554 0%, var(--bg) 45%);
+      color: var(--text);
+      min-height: 100vh;
+    }
 
-        input, button {
-            padding: 12px;
-            margin: 10px 0;
-            width: 100%;
-            border-radius: 8px;
-            border: none;
-            font-size: 16px;
-        }
+    .container {
+      width: min(1100px, 92vw);
+      margin: 24px auto 40px;
+    }
 
-        input {
-            background: #1e293b;
-            color: white;
-        }
+    .title {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 8px;
+    }
 
-        button {
-            background: #38bdf8;
-            color: black;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.2s;
-        }
+    .subtitle {
+      color: var(--muted);
+      margin: 0 0 20px;
+    }
 
-        button:hover {
-            background: #0ea5e9;
-        }
+    .panel {
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 16px;
+      backdrop-filter: blur(4px);
+    }
 
-        .result {
-            background: #1e293b;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            transition: 0.2s;
-        }
+    .section-title {
+      margin: 0 0 12px;
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
 
-        .result:hover {
-            transform: scale(1.02);
-        }
+    .row {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 10px;
+      align-items: center;
+    }
 
-        .result h3 {
-            color: #38bdf8;
-            margin-bottom: 8px;
-        }
+    .col-4 { grid-column: span 4; }
+    .col-6 { grid-column: span 6; }
+    .col-12 { grid-column: span 12; }
 
-        .result p {
-            margin: 4px 0;
-            color: #cbd5f5;
-        }
+    input[type="text"],
+    input[type="password"],
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel-soft);
+      color: var(--text);
+      outline: none;
+    }
 
-        .score {
-            display: flex;
-            gap: 15px;
-            margin-top: 8px;
-            font-size: 14px;
-        }
+    input::placeholder { color: #64748b; }
 
-        .badge {
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-weight: bold;
-        }
+    button {
+      border: 1px solid transparent;
+      background: #0369a1;
+      color: #fff;
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform .12s ease, opacity .12s ease, background .2s ease;
+    }
 
-        .similarity {
-            background: #22c55e;
-            color: black;
-        }
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-secondary { background: #374151; }
 
-        .player {
-            background: #facc15;
-            color: black;
-        }
+    .status {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    .status.error { color: var(--danger); }
+    .status.success { color: var(--success); }
 
-        .popularity {
-            background: #a78bfa;
-            color: black;
-        }
-    </style>
+    .modes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .mode-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #0b1220;
+      cursor: pointer;
+      user-select: none;
+    }
+    .mode-chip input { margin: 0; }
+
+    .quiz-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    #quizGridContainer { display: none; }
+    body.mode-quiz #quizGridContainer,
+    body.mode-hybrid #quizGridContainer { display: block; }
+
+    .quiz-item {
+      background: var(--card);
+      border: 1px solid #223047;
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .quiz-item label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.92rem;
+      color: #cbd5e1;
+    }
+
+    .slider-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .slider-value {
+      width: 28px;
+      text-align: right;
+      color: #7dd3fc;
+      font-weight: 700;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .results {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid #243247;
+      border-radius: 14px;
+      overflow: hidden;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .2s ease;
+    }
+
+    .card:hover {
+      transform: scale(1.02);
+      border-color: #3b82f6;
+      box-shadow: 0 12px 26px rgba(2, 6, 23, 0.45);
+    }
+
+    .thumb-link { display: block; line-height: 0; }
+
+    .thumb {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      display: block;
+      background: #0b1220;
+    }
+
+    .card-body { padding: 12px; }
+    .name {
+      margin: 0 0 8px;
+      font-size: 1rem;
+      line-height: 1.3;
+    }
+
+    .tags {
+      color: #93c5fd;
+      font-size: 0.86rem;
+      margin: 0 0 10px;
+      min-height: 20px;
+    }
+
+    .scores {
+      display: grid;
+      gap: 4px;
+      font-size: 0.86rem;
+      color: #cbd5e1;
+    }
+
+    .meta {
+      color: #64748b;
+      font-size: 0.8rem;
+      margin-top: 6px;
+    }
+
+    .hidden { display: none; }
+
+    @media (max-width: 800px) {
+      .col-4, .col-6 { grid-column: span 12; }
+      .quiz-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
-
 <body>
+  <main class="container">
+    <h1 class="title">Game Discovery</h1>
+    <p class="subtitle">Personalized Steam recommendations powered by your taste profile.</p>
 
-<h1>🎮 Game Recommender</h1>
+    <section class="panel">
+      <h2 class="section-title">Account</h2>
+      <div class="row">
+        <div class="col-4"><input id="username" type="text" placeholder="Username" /></div>
+        <div class="col-4"><input id="password" type="password" placeholder="Password" /></div>
+        <div class="col-4 actions">
+          <button id="loginBtn">Login</button>
+          <button id="registerBtn" class="btn-secondary">Register</button>
+          <button id="logoutBtn" class="btn-secondary hidden">Logout</button>
+        </div>
+        <div class="col-12">
+          <div id="authStatus" class="status">Not logged in.</div>
+        </div>
+      </div>
+    </section>
 
-<h2>Game-Based Recommendation</h2>
-<input type="text" id="gameInput" placeholder="Enter game name (e.g., witcher 3)">
-<button onclick="recommendGame()">Get Recommendations</button>
+    <section class="panel">
+      <h2 class="section-title">Mode</h2>
+      <div class="modes">
+        <label class="mode-chip"><input type="radio" name="mode" value="game" checked /> Game-based</label>
+        <label class="mode-chip"><input type="radio" name="mode" value="quiz" /> Quiz-based</label>
+        <label class="mode-chip"><input type="radio" name="mode" value="hybrid" /> Hybrid</label>
+      </div>
+    </section>
 
-<h2>Quiz-Based Recommendation</h2>
+    <section class="panel">
+      <h2 class="section-title">Game Input</h2>
+      <div class="row">
+        <div class="col-12">
+          <input id="gameInput" type="text" placeholder="Enter game(s), e.g. witcher 3, elden ring" />
+        </div>
+      </div>
+    </section>
 
-<div id="quiz">
-    <p>Answer from 1–5</p>
+    <div id="quizGridContainer">
+      <section class="panel">
+        <h2 class="section-title">Quiz (10 Questions)</h2>
+        <div id="quizGrid" class="quiz-grid"></div>
+      </section>
+    </div>
 
-    <label>Exploration</label>
-    <input type="range" min="1" max="5" value="3" id="q1">
+    <section class="panel">
+      <h2 class="section-title">Get Recommendations</h2>
+      <div class="actions">
+        <button id="submitBtn">Find Games</button>
+      </div>
+      <div id="requestStatus" class="status"></div>
+      <div id="results" class="results"></div>
+    </section>
+  </main>
 
-    <label>Story</label>
-    <input type="range" min="1" max="5" value="3" id="q2">
+  <script>
+    const API_BASE = "http://127.0.0.1:8000";
 
-    <label>Challenge</label>
-    <input type="range" min="1" max="5" value="3" id="q3">
+    const quizQuestions = [
+      "I enjoy exploring large worlds and hidden areas.",
+      "A strong story is important in the games I play.",
+      "I like games that challenge my skills.",
+      "I enjoy planning, optimizing, and strategic thinking.",
+      "I like games with social or cooperative experiences.",
+      "I prefer games that help me relax and unwind.",
+      "I enjoy chill exploration more than fast pacing.",
+      "I connect with characters and emotional narratives.",
+      "I like tactical decision-making under pressure.",
+      "I enjoy mastering difficult systems over time."
+    ];
 
-    <label>Strategy</label>
-    <input type="range" min="1" max="5" value="3" id="q4">
+    const authStatus = document.getElementById("authStatus");
+    const requestStatus = document.getElementById("requestStatus");
+    const usernameInput = document.getElementById("username");
+    const passwordInput = document.getElementById("password");
+    const gameInput = document.getElementById("gameInput");
+    const quizGrid = document.getElementById("quizGrid");
+    const resultsEl = document.getElementById("results");
+    const logoutBtn = document.getElementById("logoutBtn");
 
-    <label>Social</label>
-    <input type="range" min="1" max="5" value="3" id="q5">
+    function setStatus(el, message, type = "") {
+      el.textContent = message;
+      el.className = "status" + (type ? " " + type : "");
+    }
 
-    <label>Relaxation</label>
-    <input type="range" min="1" max="5" value="3" id="q6">
+    function getLoggedInUser() {
+      const user_id = localStorage.getItem("user_id");
+      const username = localStorage.getItem("username");
+      if (!user_id || !username) return null;
+      return { user_id: Number(user_id), username };
+    }
 
-    <label>Extra 1</label>
-    <input type="range" min="1" max="5" value="3" id="q7">
+    function setLoggedInUser(user_id, username) {
+      localStorage.setItem("user_id", String(user_id));
+      localStorage.setItem("username", username);
+      refreshAuthUI();
+    }
 
-    <label>Extra 2</label>
-    <input type="range" min="1" max="5" value="3" id="q8">
+    function clearLoggedInUser() {
+      localStorage.removeItem("user_id");
+      localStorage.removeItem("username");
+      refreshAuthUI();
+    }
 
-    <label>Extra 3</label>
-    <input type="range" min="1" max="5" value="3" id="q9">
+    function refreshAuthUI() {
+      const user = getLoggedInUser();
+      if (user) {
+        setStatus(authStatus, `Logged in as ${user.username}`, "success");
+        logoutBtn.classList.remove("hidden");
+      } else {
+        setStatus(authStatus, "Not logged in.");
+        logoutBtn.classList.add("hidden");
+      }
+    }
 
-    <label>Extra 4</label>
-    <input type="range" min="1" max="5" value="3" id="q10">
-
-    <button onclick="recommendQuiz()">Get Quiz Recommendations</button>
-</div>
-
-<h2>Results</h2>
-<div id="results"></div>
-
-<script>
-const API_URL = "http://127.0.0.1:8000";
-
-function displayResults(data) {
-    const container = document.getElementById("results");
-    container.innerHTML = "";
-
-    data.recommendations.forEach(game => {
-        const div = document.createElement("div");
-        div.className = "result";
-
-        div.innerHTML = `
-            <h3>${game.Name}</h3>
-            <p><b>Tags:</b> ${game.Tags.split(",").join(" • ")}</p>
-            <div class="score">
-                <span class="badge similarity">Similarity: ${game.similarity_score?.toFixed(2) ?? "—"}</span>
-                <span class="badge player">Match: ${game.player_match?.toFixed(2) ?? "—"}</span>
-                <span class="badge popularity">Pop: ${game.popularity.toFixed(2)}</span>
-            </div>
+    function buildQuizUI() {
+      quizGrid.innerHTML = "";
+      quizQuestions.forEach((text, idx) => {
+        const item = document.createElement("div");
+        item.className = "quiz-item";
+        item.innerHTML = `
+          <label for="q${idx}">${idx + 1}. ${text}</label>
+          <div class="slider-wrap">
+            <input id="q${idx}" type="range" min="1" max="5" step="1" value="3" />
+            <span id="qv${idx}" class="slider-value">3</span>
+          </div>
         `;
+        quizGrid.appendChild(item);
+        const slider = item.querySelector(`#q${idx}`);
+        const value = item.querySelector(`#qv${idx}`);
+        slider.addEventListener("input", () => value.textContent = slider.value);
+      });
+    }
 
-        container.appendChild(div);
+    function getQuizAnswers() {
+      const answers = [];
+      for (let i = 0; i < 10; i++) {
+        answers.push(Number(document.getElementById(`q${i}`).value));
+      }
+      return answers;
+    }
+
+    function selectedMode() {
+      return document.querySelector('input[name="mode"]:checked').value;
+    }
+
+    function applyModeClass(mode) {
+      document.body.classList.remove("mode-game", "mode-quiz", "mode-hybrid");
+      document.body.classList.add(`mode-${mode}`);
+    }
+
+    function safeNumber(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return null;
+      return Number(value);
+    }
+
+    function fmtScore(value) {
+      const num = safeNumber(value);
+      return num === null ? "N/A" : num.toFixed(3);
+    }
+
+    function normalizeTags(tags) {
+      if (Array.isArray(tags)) return tags.join(", ");
+      if (typeof tags === "string") return tags;
+      return "No tags";
+    }
+
+    function renderResults(games) {
+      resultsEl.innerHTML = "";
+      if (!games || games.length === 0) {
+        setStatus(requestStatus, "No results found.", "error");
+        return;
+      }
+
+      games.forEach((game) => {
+        const appId = game.AppID ?? game.appid ?? game.app_id ?? game.id;
+        const imageUrl = appId
+          ? `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`
+          : "https://placehold.co/460x215?text=Image+Not+Available";
+        const steamUrl = appId
+          ? `https://store.steampowered.com/app/${appId}`
+          : "#";
+
+        const card = document.createElement("article");
+        card.className = "card";
+        card.innerHTML = `
+          <a class="thumb-link" href="${steamUrl}" target="_blank" rel="noopener noreferrer">
+            <img
+              class="thumb"
+              src="${imageUrl}"
+              alt="${(game.Name || "Game")} banner"
+              onerror="this.src='https://placehold.co/460x215?text=Image+Not+Available'"
+            />
+          </a>
+          <div class="card-body">
+            <h3 class="name">${game.Name || "Unknown Game"}</h3>
+            <p class="tags">${normalizeTags(game.Tags)}</p>
+            <div class="scores">
+              ${game.hybrid_score !== undefined ? `<div style="color:var(--accent)">Match Score: ${fmtScore(game.hybrid_score)}</div>` : ""}
+              ${game.similarity_score !== undefined ? `<div>Similarity: ${fmtScore(game.similarity_score)}</div>` : ""}
+              <div>Player Match: ${fmtScore(game.player_match)}</div>
+              <div>Popularity: ${fmtScore(game.popularity)}</div>
+            </div>
+            <div class="meta">${appId ? `AppID: ${appId}` : "AppID unavailable"}</div>
+          </div>
+        `;
+        resultsEl.appendChild(card);
+      });
+    }
+
+    async function apiPost(path, payload) {
+      const res = await fetch(`${API_BASE}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const message = data.detail || `Request failed (${res.status})`;
+        throw new Error(message);
+      }
+      return data;
+    }
+
+    async function handleAuth(action) {
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value;
+
+      if (!username || !password) {
+        setStatus(authStatus, "Username and password are required.", "error");
+        return;
+      }
+
+      try {
+        setStatus(authStatus, `${action === "login" ? "Logging in" : "Registering"}...`);
+        const path = action === "login" ? "/auth/login" : "/auth/register";
+        const data = await apiPost(path, { username, password });
+        setLoggedInUser(data.user_id, username);
+        setStatus(authStatus, `${data.message} Logged in as ${username}.`, "success");
+      } catch (err) {
+        setStatus(authStatus, err.message || "Authentication failed.", "error");
+      }
+    }
+
+    function parseGamesInput(raw) {
+      return raw
+        .split(",")
+        .map(x => x.trim())
+        .filter(Boolean);
+    }
+
+    async function submitRecommendations() {
+      resultsEl.innerHTML = "";
+      const mode = selectedMode();
+      const user = getLoggedInUser();
+      const quiz_answers = getQuizAnswers();
+
+      try {
+        setStatus(requestStatus, "Loading recommendations...");
+
+        if (mode === "quiz") {
+          if (!user) throw new Error("Login required for quiz mode.");
+          const data = await apiPost("/recommend/quiz", {
+            user_id: user.user_id,
+            quiz_answers,
+            top_n: 10
+          });
+          renderResults(data.recommendations || []);
+          setStatus(requestStatus, "Recommendations loaded.", "success");
+          return;
+        }
+
+        const games = parseGamesInput(gameInput.value);
+        if (games.length === 0) throw new Error("Enter at least one game name.");
+
+        const merged = [];
+        const seen = new Set();
+
+        for (const game of games) {
+          const payload = { game, top_n: 10 };
+          if (user) payload.user_id = user.user_id;
+          if (mode === "hybrid") payload.quiz_answers = quiz_answers;
+
+          const data = await apiPost("/recommend/game", payload);
+          const recs = data.recommendations || [];
+          for (const r of recs) {
+            const key = String(r.AppID ?? r.appid ?? r.Name ?? Math.random());
+            if (seen.has(key)) continue;
+            seen.add(key);
+            merged.push(r);
+          }
+        }
+
+        // Sort merged games by hybrid_score if available, otherwise fallback.
+        merged.sort((a, b) => {
+          const ha = safeNumber(a.hybrid_score) ?? 0;
+          const hb = safeNumber(b.hybrid_score) ?? 0;
+          return hb - ha;
+        });
+
+        renderResults(merged.slice(0, 20));
+        setStatus(requestStatus, "Recommendations loaded.", "success");
+      } catch (err) {
+        renderResults([]);
+        setStatus(requestStatus, err.message || "Failed to fetch recommendations.", "error");
+      }
+    }
+
+    document.getElementById("loginBtn").addEventListener("click", () => handleAuth("login"));
+    document.getElementById("registerBtn").addEventListener("click", () => handleAuth("register"));
+    document.getElementById("submitBtn").addEventListener("click", submitRecommendations);
+    document.querySelectorAll('input[name="mode"]').forEach((radio) => {
+      radio.addEventListener("change", (e) => applyModeClass(e.target.value));
     });
-}
+    logoutBtn.addEventListener("click", () => {
+      clearLoggedInUser();
+      setStatus(authStatus, "Logged out.");
+    });
 
-function recommendGame() {
-    const game = document.getElementById("gameInput").value;
-
-    fetch(`${API_URL}/recommend/game`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            game: game,
-            quiz_answers: [3,3,3,3,3,3,3,3,3,3],
-            top_n: 5
-        })
-    })
-    .then(res => res.json())
-    .then(data => displayResults(data));
-}
-
-function recommendQuiz() {
-    const quiz = [
-        q1.value, q2.value, q3.value, q4.value, q5.value,
-        q6.value, q7.value, q8.value, q9.value, q10.value
-    ].map(Number);
-
-    fetch(`${API_URL}/recommend/quiz`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            quiz_answers: quiz,
-            top_n: 5
-        })
-    })
-    .then(res => res.json())
-    .then(data => displayResults(data));
-}
-</script>
-
+    buildQuizUI();
+    refreshAuthUI();
+    applyModeClass(selectedMode());
+  </script>
 </body>
 </html>

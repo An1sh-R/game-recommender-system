@@ -54,7 +54,8 @@ def recommend_games(game_name: str, top_n: int = 5):
 
     similar_indices = weighted_scores.argsort()[::-1][1:top_n+1] # skip the first one since it's the same game
 
-    results = metadata.iloc[similar_indices][["Name", "Genres", "Tags", "popularity"]].copy()
+    # Include AppID so frontend can render Steam images/links reliably.
+    results = metadata.iloc[similar_indices][["AppID", "Name", "Genres", "Tags", "popularity"]].copy()
 
     results["similarity_score"] = similarities[similar_indices]
     results["weighted_score"] = weighted_scores[similar_indices]

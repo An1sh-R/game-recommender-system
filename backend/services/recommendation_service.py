@@ -3,16 +3,17 @@ import pickle
 import redis
 import numpy as np
 import pandas as pd
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 from sklearn.metrics.pairwise import cosine_similarity
 
 from ml.content_recommender import recommend_games
 from ml.player_profile import compute_player_profile
+from backend.services.user_service import get_user_profile
 
 
 # Redis connection
 redis_client = redis.Redis(
-    host="localhost",
+    host="redis",  # Use the service name defined in docker-compose.yml
     port=6379,
     db=0,
     decode_responses=True
@@ -45,9 +46,43 @@ def trait_similarity(player_vec: np.ndarray, game_vec: np.ndarray) -> float:
     )[0][0]
 
 
-def get_recommendations(game: str, quiz_answers: List[int], top_n: int = 5) -> List[Dict]:
+def _resolve_player_profile(
+    quiz_answers: Optional[List[int]],
+    user_id: Optional[int],
+) -> Tuple[Optional[Dict[str, float]], str]:
+    """
+    Determine which personalization mode to use for game recommendations.
+    Modes:
+    - game_only: no quiz answers and no saved profile
+    - quiz_only: quiz answers only
+    - hybrid: quiz answers + user_id
+    - saved_profile: user_id with stored profile, no quiz answers
+    """
+    # Simplified Logic: Quiz always wins if present
+    if quiz_answers:
+        return compute_player_profile(quiz_answers), "quiz_only"
 
-    cache_key = f"recommendations:{game}:{top_n}:{','.join(map(str, quiz_answers))}"
+    # If no quiz, try to use their past history
+    if user_id:
+        saved_profile = get_user_profile(user_id)
+        if saved_profile:
+            return {t: float(saved_profile[t]) for t in TRAIT_ORDER}, "saved_profile"
+
+    # Total stranger / No data
+    return None, "game_only"
+
+
+def get_recommendations(
+    game: str,
+    quiz_answers: Optional[List[int]] = None,
+    top_n: int = 5,
+    user_id: Optional[int] = None,
+) -> Dict:
+
+    # Include user_id in cache key whenever available to avoid cross-user contamination.
+    quiz_part = ",".join(map(str, quiz_answers)) if quiz_answers is not None else "none"
+    user_part = str(user_id) if user_id is not None else "none"
+    cache_key = f"recommendations:{game}:{top_n}:quiz={quiz_part}:user={user_part}"
 
     cached_result = redis_client.get(cache_key)
 
@@ -60,17 +95,22 @@ def get_recommendations(game: str, quiz_answers: List[int], top_n: int = 5) -> L
     # Tell Pylance what this is
     results: List[Dict] = recommend_games(game, top_n=50)
 
-    # compute player profile
-    player_profile = compute_player_profile(quiz_answers)
-    player_vec = profile_to_vector(player_profile)
+    player_profile, mode = _resolve_player_profile(quiz_answers=quiz_answers, user_id=user_id)
+    player_vec: Optional[np.ndarray] = None
+    if player_profile is not None:
+        player_vec = profile_to_vector(player_profile)
 
     for r in results:
 
         idx = r["index"]   # index must come from content_recommender
 
-        game_vec = np.array(list(game_traits[idx].values()))
+        game_vec = np.array([game_traits[idx][t] for t in TRAIT_ORDER])
 
-        player_match = trait_similarity(player_vec, game_vec)
+        # Keep ML core intact: only compute trait similarity when profile exists.
+        if player_vec is not None:
+            player_match = trait_similarity(player_vec, game_vec)
+        else:
+            player_match = 0.0
 
         r["player_match"] = float(player_match)
 
@@ -84,17 +124,24 @@ def get_recommendations(game: str, quiz_answers: List[int], top_n: int = 5) -> L
 
     results = results[:top_n]
 
-    redis_client.set(cache_key, json.dumps(results), ex=3600)
+    payload = {"mode": mode, "recommendations": results}
+    redis_client.set(cache_key, json.dumps(payload), ex=3600)
 
-    return results
+    return payload
 
 
 
 GAME_METADATA = pd.read_csv("data/vectors/games_metadata.csv")
 game_trait_matrix = np.array([list(trait_dict.values()) for trait_dict in game_traits])
 
-def get_quiz_recommendations(quiz_answers: List[int], top_n: int = 5,metadata=GAME_METADATA) -> List[Dict]:
-    cache_key = f"quiz_recommendation:{top_n}:{','.join(map(str,quiz_answers))}"
+def get_quiz_recommendations(
+    quiz_answers: List[int],
+    top_n: int = 5,
+    metadata=GAME_METADATA,
+    user_id: Optional[int] = None,
+) -> Dict:
+    user_part = str(user_id) if user_id is not None else "none"
+    cache_key = f"quiz_recommendation:{top_n}:{','.join(map(str,quiz_answers))}:user={user_part}"
     cached_result = redis_client.get(cache_key)
 
     if cached_result is not None:
@@ -121,6 +168,7 @@ def get_quiz_recommendations(quiz_answers: List[int], top_n: int = 5,metadata=GA
         game_info = metadata.iloc[idx]
 
         results.append({
+            "AppID": int(game_info["AppID"]),
             "Name": game_info["Name"],
             "Genres": game_info["Genres"],
             "Tags": game_info["Tags"],
@@ -128,6 +176,7 @@ def get_quiz_recommendations(quiz_answers: List[int], top_n: int = 5,metadata=GA
             "player_match": float(similarities[idx]),
             "hybrid_score": float(hybrid_scores[idx])
         })
-    redis_client.set(cache_key, json.dumps(results), ex=3600)
-    return results
+    payload = {"mode": "quiz_only", "recommendations": results}
+    redis_client.set(cache_key, json.dumps(payload), ex=3600)
+    return payload
  
