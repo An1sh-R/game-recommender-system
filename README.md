@@ -1,0 +1,2 @@
+postgresql://postgres:vhkV413Ce0c7JUvv@db.ggyoumpukwiirucwhbbh.supabase.co:5432/postgres
+redis:// default:gQAAAAAAAUVWAAIncDFjOWUyNWRmNjdjYzU0M2NkOWE5MDcyYjkzYzJmOGUxY3AxODMyODY@enormous-falcon-83286.upstash.io:6379
