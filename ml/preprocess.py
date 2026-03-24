@@ -19,7 +19,6 @@ def parse_owners(val):
 
 df["owners_mid"] = df["Estimated owners"].apply(parse_owners)
 
-# normalize to 0–1
 df["popularity"] = np.log(df["owners_mid"] + 1) # add 1 to avoid log(0)
 df["popularity"] = df["popularity"] / df["popularity"].max() # scale to 0–1
 df["combined_text"] = df["Genres"].astype(str) + " " + df["Categories"].astype(str) + " " + df["Tags"].astype(str) + " " + df["About the game"].astype(str)

@@ -26,9 +26,10 @@ def recommend_game(req: recommendationRequest):
     }
 @router.post("/recommend/quiz")
 def recommend_quiz(req: QuizRecommendationRequest):
-    # Quiz submission is stateful: compute profile and save it for future sessions.
+    # Quiz submission is stateful: compute profile and save it for future sessions when user is known.
     profile = compute_player_profile(req.quiz_answers)
-    save_user_profile(req.user_id, profile)
+    if req.user_id is not None:
+        save_user_profile(req.user_id, profile)
 
     result = get_quiz_recommendations(
         quiz_answers=req.quiz_answers,

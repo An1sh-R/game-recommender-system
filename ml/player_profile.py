@@ -28,10 +28,7 @@ TRAITS = [
 
 
 def _normalize_answer(answer: int) -> float:
-    """
-    Convert quiz answer from 1-5 to 0-1.
-    1 -> 0.0, 5 -> 1.0
-    """
+    # Normalize from [1..5] to [0..1]
     return (float(answer) - 1.0) / 4.0
 
 

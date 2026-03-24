@@ -17,7 +17,7 @@ class recommendationRequest(BaseModel):
         return values
 
 class QuizRecommendationRequest(BaseModel):
-    user_id: int
+    user_id: Optional[int] = None
     quiz_answers: List[int] = Field(..., min_length=10, max_length=10)
     top_n: int = 5
 

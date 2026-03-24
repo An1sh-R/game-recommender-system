@@ -502,12 +502,13 @@
         setStatus(requestStatus, "Loading recommendations...");
 
         if (mode === "quiz") {
-          if (!user) throw new Error("Login required for quiz mode.");
-          const data = await apiPost("/recommend/quiz", {
-            user_id: user.user_id,
+          const payload = {
             quiz_answers,
-            top_n: 10
-          });
+            top_n: 9
+          };
+          if (user) payload.user_id = user.user_id;
+
+          const data = await apiPost("/recommend/quiz", payload);
           renderResults(data.recommendations || []);
           setStatus(requestStatus, "Recommendations loaded.", "success");
           return;

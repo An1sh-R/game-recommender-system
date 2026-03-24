@@ -12,13 +12,11 @@ from backend.services.user_service import get_user_profile
 
 
 # Redis connection
-redis_client = redis.Redis(
-    host="redis",  # Use the service name defined in docker-compose.yml
-    port=6379,
-    db=0,
+import os
+redis_client = redis.from_url(
+    os.getenv("REDIS_URL", "redis://localhost:6379/0"),
     decode_responses=True
 )
-
 
 # load game trait vectors once
 with open("data/vectors/game_traits.pkl", "rb") as f:
@@ -49,26 +47,42 @@ def trait_similarity(player_vec: np.ndarray, game_vec: np.ndarray) -> float:
 def _resolve_player_profile(
     quiz_answers: Optional[List[int]],
     user_id: Optional[int],
+    source: str = "game",
 ) -> Tuple[Optional[Dict[str, float]], str]:
     """
-    Determine which personalization mode to use for game recommendations.
-    Modes:
-    - game_only: no quiz answers and no saved profile
-    - quiz_only: quiz answers only
-    - hybrid: quiz answers + user_id
-    - saved_profile: user_id with stored profile, no quiz answers
+    Determine which personalization mode to use for recommendations.
+    - game: get_recommendations path
+      - hybrid: when quiz_answers provided (and optionally saved profile for better blending)
+      - game_only: no quiz answers
+    - quiz: get_quiz_recommendations path
+      - quiz_only: always use quiz answers (no saved profile blending)
     """
-    # Simplified Logic: Quiz always wins if present
+
+    if source == "quiz":
+        # quiz-only mode: use quiz-derived profile and do not blend with saved profile.
+        if quiz_answers:
+            return compute_player_profile(quiz_answers), "quiz_only"
+        return None, "quiz_only"
+
+    # source == "game":
     if quiz_answers:
-        return compute_player_profile(quiz_answers), "quiz_only"
+        # Game+quiz hybrid mode.
+        if user_id:
+            saved_profile = get_user_profile(user_id)
+            if saved_profile:
+                quiz_profile = compute_player_profile(quiz_answers)
+                blended_profile = {}
+                for trait in TRAIT_ORDER:
+                    blended_profile[trait] = (
+                        0.7 * quiz_profile[trait] +
+                        0.3 * float(saved_profile[trait])
+                    )
+                return blended_profile, "hybrid"
 
-    # If no quiz, try to use their past history
-    if user_id:
-        saved_profile = get_user_profile(user_id)
-        if saved_profile:
-            return {t: float(saved_profile[t]) for t in TRAIT_ORDER}, "saved_profile"
+        # No saved profile or no user ID: still consider as hybrid (game + quiz profile)
+        return compute_player_profile(quiz_answers), "hybrid"
 
-    # Total stranger / No data
+    # No quiz answers in game mode -> game-only.
     return None, "game_only"
 
 
@@ -149,9 +163,18 @@ def get_quiz_recommendations(
         return json.loads(str(cached_result))
 
     print("Quiz Cache miss")
-    player_profile = compute_player_profile(quiz_answers)
+    
+    # Use same profile resolution logic for consistency
+    player_profile, mode = _resolve_player_profile(
+        quiz_answers=quiz_answers,
+        user_id=user_id,
+        source="quiz",
+    )
+    if player_profile is None:
+        # No profile available, return empty results for quiz mode
+        return {"mode": mode, "recommendations": []}
+    
     player_vec = profile_to_vector(player_profile)
-    results = []
 
     # VECTORIZED similarity (FAST)
     similarities = cosine_similarity(
@@ -176,7 +199,6 @@ def get_quiz_recommendations(
             "player_match": float(similarities[idx]),
             "hybrid_score": float(hybrid_scores[idx])
         })
-    payload = {"mode": "quiz_only", "recommendations": results}
+    payload = {"mode": mode, "recommendations": results}
     redis_client.set(cache_key, json.dumps(payload), ex=3600)
     return payload
- 

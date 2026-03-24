@@ -16,6 +16,7 @@ services:
       DB_NAME: games
       DB_USER: postgres
       DB_PASSWORD: postgres
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - .:/app
 
